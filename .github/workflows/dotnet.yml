@@ -30,11 +30,11 @@ jobs:
         
       - name: Restore dependencies
         run: dotnet restore
-        working-directory: ${{ env.ROOT_SOLUTION_PATH }}
+        working-directory: .
 
       - name: Build Function App for Release
         run: dotnet build --configuration Release --output ./output
-        working-directory: ${{ env.AZURE_FUNCTION_PROJ_PATH }}
+        working-directory: .
 
       - name: 'Run Azure Functions Action'
         uses: Azure/functions-action@v1
