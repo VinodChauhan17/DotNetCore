@@ -11,40 +11,43 @@ on:
   workflow_dispatch:
   
 env:
-  AZURE_FUNCTIONAPP_NAME: 'demo-fun-app-001'   # set this to your function app name on Azure
-  AZURE_FUNCTIONAPP_PACKAGE_PATH: '.'       # set this to the path to your function app project, defaults to the repository root
-  DOTNET_VERSION: '6.0.x'                   # set this to the dotnet version to use (e.g. '2.1.x', '3.1.x', '5.0.x')
+  AZURE_FUNCTIONAPP_NAME: demo-fun-app-001 # set this to the name of your azure function app resource
+  AZURE_FUNCTION_PROJ_PATH: src/Sample.FunctionApp  # set this to the path to your function app project
+  ROOT_SOLUTION_PATH: DotNetCore # set this to the root path of your solution/project file
 
 jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest # For Linux, use ubuntu-latest
-    environment: dev
-    steps:
-    - name: 'Checkout GitHub Action'
-      uses: actions/checkout@v3
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:    
+      - name: Get the latest source code commit
+        uses: actions/checkout@v2
 
-    # If you want to use Azure RBAC instead of Publish Profile, then uncomment the task below
-    # - name: 'Login via Azure CLI'
-    #   uses: azure/login@v1
-    #   with:
-    #     creds: ${{ secrets.AZURE_RBAC_CREDENTIALS }} # set up AZURE_RBAC_CREDENTIALS secrets in your repository
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v1
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+        
+      - name: Restore dependencies
+        run: dotnet restore
+        working-directory: ${{ env.ROOT_SOLUTION_PATH }}
 
-    - name: Setup DotNet ${{ env.DOTNET_VERSION }} Environment
-      uses: actions/setup-dotnet@v3
-      with:
-        dotnet-version: ${{ env.DOTNET_VERSION }}
+      - name: Build for Testing
+        run: dotnet build --no-restore
+        working-directory: ${{ env.ROOT_SOLUTION_PATH }}
+      
+      - name: Test
+        run: dotnet test --no-build --verbosity normal
+        working-directory: ${{ env.ROOT_SOLUTION_PATH }}
+      
+      - name: Build Function App for Release
+        run: dotnet build --configuration Release --output ./output
+        working-directory: ${{ env.AZURE_FUNCTION_PROJ_PATH }}
 
-    - name: 'Resolve Project Dependencies Using Dotnet'
-      shell: pwsh # For Linux, use bash
-      run: |
-        pushd './${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}'
-        dotnet build --configuration Release --output ./output
-        popd
-
-    - name: 'Run Azure Functions Action'
-      uses: Azure/functions-action@v1
-      id: fa
-      with:
-        app-name: ${{ env.AZURE_FUNCTIONAPP_NAME }}
-        package: '${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/output'
-        publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }} # Remove publi
+      - name: 'Run Azure Functions Action'
+        uses: Azure/functions-action@v1
+        id: fa
+        with:
+          app-name: ${{ env.AZURE_FUNCTIONAPP_NAME }}
+          package: '${{ env.AZURE_FUNCTION_PROJ_PATH }}/output'
+          publish-profile: ${{ secrets.AZURE_FUNCTION_PUBLISH_CREDS }}
